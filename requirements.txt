@@ -161,7 +161,7 @@ terminado==0.18.1
 threadpoolctl==3.6.0
 tinycss2==1.5.1
 toml==0.10.2
-torch @ file:///D:/Dev/torch-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl#sha256=473d76257636c66b22cbfac6f616d6b522ef3d3473c13decb1afda22a7b059eb
+torch
 tornado==6.5.7
 tqdm==4.68.3
 traitlets==5.15.1
