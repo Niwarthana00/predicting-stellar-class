@@ -32,12 +32,12 @@ import streamlit as st
 from catboost import Pool
 
 APP_DIR = Path(__file__).parent
-BUNDLE_PATH = APP_DIR / "models" / "production_bundle.pkl"
 
 # The bundle file is too large to keep in the app repo, so it lives on the
-# Hugging Face Hub instead and gets downloaded into BUNDLE_PATH the first
-# time the app starts (then reused from disk on every rerun after that).
-HF_REPO_ID = "sathyanjali00/predicting-stellar-class-model"
+# Hugging Face Hub instead. huggingface_hub downloads it into its own local
+# cache the first time the app starts, and reuses that cached copy on every
+# rerun after that -- no need to manage the file ourselves.
+HF_REPO_ID = "sachintha00/predicting-stellar-model"
 HF_FILENAME = "production_bundle.pkl"
 
 # ── Feature layout (purely for UI organisation; source of truth for WHICH
@@ -76,37 +76,24 @@ NEGATIVE = "#8C6B5A"
 
 
 # ── Data / model loading ────────────────────────────────────────────────
-def download_bundle_if_missing():
-    """Fetch the bundle from the Hugging Face Hub the first time it's needed.
-
-    On later runs BUNDLE_PATH already exists, so this becomes a no-op and
-    the app starts instantly.
-    """
-    if BUNDLE_PATH.exists():
-        return
-
-    import shutil
-    from huggingface_hub import hf_hub_download
-
-    BUNDLE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    downloaded_path = hf_hub_download(repo_id=HF_REPO_ID, filename=HF_FILENAME)
-    # shutil.move (unlike Path.rename) copies-then-deletes when the source
-    # and destination are on different filesystems, which is the case here:
-    # hf_hub_download saves into its own cache mount, not our models/ folder.
-    shutil.move(downloaded_path, BUNDLE_PATH)
-
-
 @st.cache_resource(show_spinner="Loading production bundle…")
 def load_bundle():
     import sys
     sys.path.insert(0, str(APP_DIR))
     import joblib
     from src.models.predict import wrap_lgb_model
+    from huggingface_hub import hf_hub_download
 
-    download_bundle_if_missing()
-    if not BUNDLE_PATH.exists():
+    # hf_hub_download keeps its own local cache: the first call downloads
+    # the file, every call after that just returns the cached path
+    # instantly. No need to also copy it into our repo's models/ folder.
+    try:
+        bundle_path = hf_hub_download(repo_id=HF_REPO_ID, filename=HF_FILENAME)
+    except Exception as e:
+        st.error(f"Could not download the model bundle from Hugging Face: {e}")
         return None
-    bundle = joblib.load(BUNDLE_PATH)
+
+    bundle = joblib.load(bundle_path)
     bundle["_wrap_lgb_model"] = wrap_lgb_model
     return bundle
 
@@ -443,7 +430,7 @@ def render_result(bundle, row, proba, per_model):
 
     with st.expander("Global feature importance"):
         try:
-            ranking = global_shap_importance(str(BUNDLE_PATH), bundle)
+            ranking = global_shap_importance(f"{HF_REPO_ID}/{HF_FILENAME}", bundle)
             max_val = max(v for _, v in ranking) or 1.0
             for name, val in ranking:
                 shap_bar(name, val, max_val)
@@ -477,7 +464,10 @@ def main():
 
     bundle = load_bundle()
     if bundle is None:
-        st.error(f"No bundle found at `{BUNDLE_PATH}`. Run Notebook 05 first to produce it.")
+        st.error(
+            f"Could not load the production bundle from Hugging Face "
+            f"(`{HF_REPO_ID}/{HF_FILENAME}`). See the error above for details."
+        )
         st.stop()
 
     render_header(bundle)
