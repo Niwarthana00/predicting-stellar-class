@@ -37,7 +37,7 @@ BUNDLE_PATH = APP_DIR / "models" / "production_bundle.pkl"
 # The bundle file is too large to keep in the app repo, so it lives on the
 # Hugging Face Hub instead and gets downloaded into BUNDLE_PATH the first
 # time the app starts (then reused from disk on every rerun after that).
-HF_REPO_ID = "sachintha00/predicting-stellar-model"
+HF_REPO_ID = "sathyanjali00/predicting-stellar-class-model"
 HF_FILENAME = "production_bundle.pkl"
 
 # ── Feature layout (purely for UI organisation; source of truth for WHICH
