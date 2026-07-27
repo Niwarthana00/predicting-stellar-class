@@ -37,7 +37,7 @@ BUNDLE_PATH = APP_DIR / "models" / "production_bundle.pkl"
 # The bundle file is too large to keep in the app repo, so it lives on the
 # Hugging Face Hub instead and gets downloaded into BUNDLE_PATH the first
 # time the app starts (then reused from disk on every rerun after that).
-HF_REPO_ID = "sathyanjali00/predicting-stellar-class-model"
+HF_REPO_ID = "sachintha00/predicting-stellar-model"
 HF_FILENAME = "production_bundle.pkl"
 
 # ── Feature layout (purely for UI organisation; source of truth for WHICH
@@ -85,11 +85,15 @@ def download_bundle_if_missing():
     if BUNDLE_PATH.exists():
         return
 
+    import shutil
     from huggingface_hub import hf_hub_download
 
     BUNDLE_PATH.parent.mkdir(parents=True, exist_ok=True)
     downloaded_path = hf_hub_download(repo_id=HF_REPO_ID, filename=HF_FILENAME)
-    Path(downloaded_path).rename(BUNDLE_PATH)
+    # shutil.move (unlike Path.rename) copies-then-deletes when the source
+    # and destination are on different filesystems, which is the case here:
+    # hf_hub_download saves into its own cache mount, not our models/ folder.
+    shutil.move(downloaded_path, BUNDLE_PATH)
 
 
 @st.cache_resource(show_spinner="Loading production bundle…")
