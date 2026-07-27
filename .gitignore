@@ -16,6 +16,7 @@ pyvenv.cfg
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 __notebook_source__.ipynb
+**/*.zip
 
 __pycache__/
 *.py[cod]
@@ -30,7 +31,12 @@ __pycache__/
 *.sln
 *.swp
 
-models/*.pkl
-models/*.joblib
-models/*.bst
+models/*
+outputs/*
+reports/*
+# !models/*.pkl
+# models/*.joblib
+# models/*.bst
 *.log
+
+**/catboost_info
