@@ -1,27 +1,3 @@
-"""
-Stellar Classifier — production inference console.
-
-Loads models/production_bundle.pkl (built by Notebook 05) and serves
-predictions through a Streamlit UI styled as a quiet instrument console:
-one muted accent colour, no gradients, monospace for every number.
-
-──────────────────────────────────────────────────────────────────────────
-EXTENDING THIS APP
-──────────────────────────────────────────────────────────────────────────
-1. New engineered feature       -> add its name to the right list in
-                                    FEATURE_GROUPS. Anything in the bundle's
-                                    feature_names that isn't grouped yet
-                                    automatically falls into "Other Features",
-                                    so nothing silently disappears.
-2. New model family (e.g. XGB)  -> add a loader branch in load_bundle(),
-                                    a weight key in bundle['blend_weights'],
-                                    and one block in run_inference() that
-                                    mirrors the lgb/cat blocks already there.
-3. New explainability panel     -> add a function near render_shap_panel()
-                                    and call it from render_result() the
-                                    same way the existing panels are called.
-──────────────────────────────────────────────────────────────────────────
-"""
 
 import os
 from pathlib import Path
@@ -33,15 +9,9 @@ from catboost import Pool
 
 APP_DIR = Path(__file__).parent
 
-# The bundle file is too large to keep in the app repo, so it lives on the
-# Hugging Face Hub instead. huggingface_hub downloads it into its own local
-# cache the first time the app starts, and reuses that cached copy on every
-# rerun after that -- no need to manage the file ourselves.
 HF_REPO_ID = "sachintha00/predicting-stellar-model"
 HF_FILENAME = "production_bundle.pkl"
 
-# ── Feature layout (purely for UI organisation; source of truth for WHICH
-#    features exist is always bundle['feature_names']) ─────────────────────
 FEATURE_GROUPS = {
     "Astrometry": ["alpha", "delta", "delta_abs"],
     "Photometry (ugriz)": ["u", "g", "r", "i", "z"],
@@ -75,7 +45,6 @@ TEXT_DIM = "#8B92A5"
 NEGATIVE = "#8C6B5A"
 
 
-# ── Data / model loading ────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading production bundle…")
 def load_bundle():
     import sys
@@ -84,9 +53,6 @@ def load_bundle():
     from src.models.predict import wrap_lgb_model
     from huggingface_hub import hf_hub_download
 
-    # hf_hub_download keeps its own local cache: the first call downloads
-    # the file, every call after that just returns the cached path
-    # instantly. No need to also copy it into our repo's models/ folder.
     try:
         bundle_path = hf_hub_download(repo_id=HF_REPO_ID, filename=HF_FILENAME)
     except Exception as e:
@@ -128,18 +94,11 @@ def run_inference(bundle: dict, row: pd.DataFrame):
 
 @st.cache_data(show_spinner=False)
 def global_shap_importance(_bundle_id: str, _bundle: dict, top_n: int = 12):
-    """Global |SHAP| ranking from the stored background sample (cheap, cached).
 
-    Both _bundle_id and _bundle start with an underscore on purpose: st.cache_data
-    tries to hash every argument to know when to reuse a cached result, and a
-    dict full of model objects can't be hashed. The underscore tells Streamlit
-    "don't hash this one, trust me" -- _bundle_id (a plain string, the bundle's
-    file path) is what actually keys the cache instead.
-    """
     cat_model = _bundle["catboost_models"][0]
     bg = _bundle["shap_background_sample"]
     raw = np.asarray(cat_model.get_feature_importance(type="ShapValues", data=Pool(bg)))
-    values = raw[:, :, :-1]  # drop CatBoost's trailing bias term
+    values = raw[:, :, :-1]  
     mean_abs = np.abs(values).mean(axis=(0, 1))
     order = np.argsort(mean_abs)[::-1][:top_n]
     names = np.array(_bundle["feature_names"])[order]
@@ -155,7 +114,6 @@ def local_shap_contribution(bundle: dict, row: pd.DataFrame, class_index: int, t
     return list(zip(names, values[order]))
 
 
-# ── Styling ──────────────────────────────────────────────────────────────
 def inject_css():
     st.markdown(f"""
     <style>
@@ -300,7 +258,6 @@ def meter(label: str, value: float, is_top: bool):
 def shap_bar(name: str, value: float, max_abs: float):
     width_pct = (abs(value) / max_abs * 100) if max_abs > 0 else 0
     color = ACCENT if value >= 0 else NEGATIVE
-    # bar grows from centre so sign is visually legible without extra colour noise
     st.markdown(f"""
     <div class="shap-bar-row">
         <div class="shap-name">{name}</div>
@@ -312,7 +269,6 @@ def shap_bar(name: str, value: float, max_abs: float):
     """, unsafe_allow_html=True)
 
 
-# ── Sidebar: input console ──────────────────────────────────────────────
 def render_sidebar(bundle: dict) -> pd.DataFrame:
     st.sidebar.markdown('<div class="eyebrow">Input Console</div>', unsafe_allow_html=True)
     st.sidebar.markdown("### Observation")
@@ -346,10 +302,6 @@ def render_sidebar(bundle: dict) -> pd.DataFrame:
         with st.sidebar.expander(group_name, expanded=first):
             for f in present:
                 key = f"feat_{f}"
-                # Seed session_state once, then let the widget read purely from
-                # its key -- passing `value=` on every rerun *and* pre-setting
-                # session_state for the same key is what Streamlit warns about,
-                # and for checkboxes it hard-fails on a float default.
                 if f in BINARY_FEATURES:
                     st.session_state.setdefault(key, False)
                     values[f] = int(st.checkbox(f, key=key))
@@ -362,7 +314,6 @@ def render_sidebar(bundle: dict) -> pd.DataFrame:
     return row
 
 
-# ── Main panels ──────────────────────────────────────────────────────────
 def render_header(bundle):
     st.markdown('<div class="app-header">', unsafe_allow_html=True)
     st.markdown('<div class="eyebrow">Production Inference</div>', unsafe_allow_html=True)
@@ -457,7 +408,6 @@ def render_result(bundle, row, proba, per_model):
         """, unsafe_allow_html=True)
 
 
-# ── Entry point ────────────────────────────────────────────────────────
 def main():
     st.set_page_config(page_title="Stellar Classifier", page_icon="◐", layout="wide")
     inject_css()
