@@ -9,16 +9,6 @@ REVERSE_MAP = {0: 'GALAXY', 1: 'QSO', 2: 'STAR'}
 
 
 class LGBWrapper:
-    """Thin sklearn-like adapter around a raw lgb.Booster.
-
-    This used to be defined *inside* wrap_lgb_model() as a local class. That
-    made every instance unpicklable: pickle/joblib serialize a class by its
-    dotted import path (module.ClassName), and a class defined inside a
-    function has no such path (it shows up as
-    'module.wrap_lgb_model.<locals>._LGBWrapper', which can't be re-imported).
-    Defining it here, at module level, gives it a real path
-    (src.models.predict.LGBWrapper) so it pickles and unpickles normally.
-    """
 
     def __init__(self, booster):
         self.booster = booster
@@ -45,8 +35,6 @@ def load_lgb_models(model_dir='models'):
     for f in sorted(os.listdir(model_dir)):
         full_path = os.path.join(model_dir, f)
         if os.path.isfile(full_path) and f.startswith('lgb_fold') and f.endswith('.txt'):
-            # Wrap Booster in a small adapter that provides a sklearn-like
-            # `predict_proba` interface expected by the rest of the codebase.
             booster = lgb.Booster(model_file=full_path)
 
             models.append(wrap_lgb_model(booster))
