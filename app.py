@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 
@@ -9,7 +8,7 @@ from catboost import Pool
 
 APP_DIR = Path(__file__).parent
 
-HF_REPO_ID = "sachintha00/predicting-stellar-model"
+HF_REPO_ID = "sathyanjali00/predicting-stellar-class-model"
 HF_FILENAME = "production_bundle.pkl"
 
 FEATURE_GROUPS = {
@@ -50,7 +49,7 @@ def load_bundle():
     import sys
     sys.path.insert(0, str(APP_DIR))
     import joblib
-    from src.models.predict import wrap_lgb_model
+    from src.models.predict import wrap_lightgbm_booster as wrap_lgb_model
     from huggingface_hub import hf_hub_download
 
     try:
