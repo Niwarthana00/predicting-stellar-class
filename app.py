@@ -43,12 +43,27 @@ TEXT = "#E8E9ED"
 TEXT_DIM = "#8B92A5"
 NEGATIVE = "#8C6B5A"
 
+class _LegacyLGBWrapper:
+    def extract_booster(self):
+        import lightgbm as lgb
+
+        for value in self.__dict__.values():
+            if isinstance(value, lgb.Booster):
+                return value
+        for value in self.__dict__.values():
+            if hasattr(value, "predict") and not isinstance(value, type):
+                return value
+        raise AttributeError(
+            f"No LightGBM booster found in legacy wrapper (attrs: {list(self.__dict__)})"
+        )
+
 
 @st.cache_resource(show_spinner="Loading production bundle…")
 def load_bundle():
     import sys
     sys.path.insert(0, str(APP_DIR))
     import joblib
+    import src.models.predict as predict_mod
     from src.models.predict import wrap_lightgbm_booster as wrap_lgb_model
     from huggingface_hub import hf_hub_download
 
@@ -58,7 +73,20 @@ def load_bundle():
         st.error(f"Could not download the model bundle from Hugging Face: {e}")
         return None
 
-    bundle = joblib.load(bundle_path)
+    if not hasattr(predict_mod, "LGBWrapper"):
+        predict_mod.LGBWrapper = _LegacyLGBWrapper
+
+    try:
+        bundle = joblib.load(bundle_path)
+    except Exception as e:
+        st.error(f"Could not unpickle the model bundle: {type(e).__name__}: {e}")
+        return None
+    
+    bundle["lightgbm_models"] = [
+        wrap_lgb_model(m.extract_booster()) if isinstance(m, _LegacyLGBWrapper) else m
+        for m in bundle["lightgbm_models"]
+    ]
+
     bundle["_wrap_lgb_model"] = wrap_lgb_model
     return bundle
 
